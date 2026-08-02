@@ -1,0 +1,53 @@
+# Operating systems
+.DS_Store
+Thumbs.db
+
+# Editor and local machine state
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node and frontend
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# PlatformIO and embedded build output
+.pio/
+*.elf
+*.hex
+*.bin
+*.map
+
+# Logs and generated runtime data
+*.log
+logs/
+tmp/
+data/
+
+# Docker and local database volumes
+postgres-data/
+mosquitto-data/
+mosquitto-log/
+
