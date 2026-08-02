@@ -17,6 +17,17 @@ The frontend side uses Next.js to display the climate data in a web dashboard. T
 - 16x2 LCD display
 - Breadboard and jumper wires
 
+## Wiring
+
+- DHT11 data -> Arduino D2
+- LCD RS -> Arduino D7
+- LCD Enable -> Arduino D8
+- LCD D4 -> Arduino D3
+- LCD D5 -> Arduino D4
+- LCD D6 -> Arduino D5
+- LCD D7 -> Arduino D6
+- LCD RW -> GND
+
 ## Software and Skills
 
 - C++ for Arduino firmware
