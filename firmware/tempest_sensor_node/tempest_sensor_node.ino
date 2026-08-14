@@ -12,6 +12,7 @@ const int LCD_D6 = 5;
 const int LCD_D7 = 6;
 
 const unsigned long READ_INTERVAL_MS = 2000;
+const unsigned long SERIAL_BAUD_RATE = 9600;
 
 DHT dht(DHT_PIN, DHT_TYPE);
 LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
@@ -19,6 +20,7 @@ LiquidCrystal lcd(LCD_RS, LCD_ENABLE, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
 unsigned long lastReadAt = 0;
 
 void setup() {
+  Serial.begin(SERIAL_BAUD_RATE);
   dht.begin();
   lcd.begin(16, 2);
 
@@ -43,6 +45,8 @@ void loop() {
   float temperatureC = dht.readTemperature();
 
   if (isnan(humidity) || isnan(temperatureC)) {
+    Serial.println("status=error,error=sensor_read_failed");
+
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Sensor error");
@@ -50,6 +54,11 @@ void loop() {
     lcd.print("Check DHT11");
     return;
   }
+
+  Serial.print("status=ok,temp_c=");
+  Serial.print(temperatureC, 1);
+  Serial.print(",humidity=");
+  Serial.println(humidity, 1);
 
   lcd.clear();
   lcd.setCursor(0, 0);

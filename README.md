@@ -4,7 +4,7 @@ Reliable Indoor Climate Telemetry.
 
 Tempest is an indoor climate monitoring project that connects physical hardware to a backend system and a web dashboard. The project reads temperature and humidity from a sensor, sends that data into software, and organizes it so it can be stored, viewed, and used by other parts of the application.
 
-The hardware side uses an Arduino Uno R3 connected to a DHT11 temperature and humidity sensor and a 16x2 LCD display. The Arduino reads the sensor data and shows the current room conditions on the LCD.
+The hardware side uses an Arduino Uno R3 connected to a DHT11 temperature and humidity sensor and a 16x2 LCD display. The Arduino reads the sensor data, shows the current room conditions on the LCD, and prints the readings over USB Serial.
 
 The backend side is the main software focus of the project. It is where the sensor readings can be received, validated, stored, and served through an API. Through Tempest, I am learning how backend systems work with real-world data instead of only static examples.
 
@@ -44,6 +44,7 @@ The frontend side uses Next.js to display the climate data in a web dashboard. T
 - REST API design for sending data between the hardware, backend, and dashboard
 - Sensor data handling for real temperature and humidity readings
 - LCD output for displaying live measurements
+- Serial output for sending hardware readings to software
 - Git and GitHub for version control and project organization
 
 Tempest combines embedded systems, backend development, databases, and basic electronics into one hands-on project.
