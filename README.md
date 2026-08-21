@@ -10,6 +10,10 @@ The backend side is the main software focus of the project. It is where the sens
 
 The frontend side uses Next.js to display the climate data in a web dashboard. This gives the project a simple full-stack structure: hardware collects the data, the backend processes it, and the frontend shows it to the user.
 
+## Current Goal
+
+The goal of Tempest is to build a full-stack indoor climate telemetry system. The Arduino reads live temperature and humidity from the DHT11 sensor, the computer forwards those readings into a backend API, the backend validates and stores the data, and the dashboard displays current and historical room conditions.
+
 ## Hardware
 
 - Arduino Uno R3
@@ -46,5 +50,59 @@ The frontend side uses Next.js to display the climate data in a web dashboard. T
 - LCD output for displaying live measurements
 - Serial output for sending hardware readings to software
 - Git and GitHub for version control and project organization
+
+## Serial to Backend Bridge
+
+The Arduino firmware prints machine-readable sensor lines over USB Serial:
+
+```text
+status=ok,temp_c=23.4,humidity=41.0
+```
+
+The Python bridge in `tools/serial_forwarder.py` reads those lines and forwards successful readings to the backend API.
+
+Install the backend dependencies:
+
+```powershell
+python -m pip install -r backend/requirements.txt
+```
+
+Start PostgreSQL:
+
+```powershell
+docker compose up -d postgres
+```
+
+Start the local backend:
+
+```powershell
+python -m uvicorn backend.app.main:app --reload
+```
+
+Install the serial bridge dependency:
+
+```powershell
+python -m pip install -r tools/requirements.txt
+```
+
+Run the bridge, replacing `COM3` with the Arduino port shown by the Arduino IDE:
+
+```powershell
+python tools/serial_forwarder.py --port COM3
+```
+
+For a quick test without the Arduino connected, run:
+
+```powershell
+'status=ok,temp_c=23.4,humidity=41.0' | python tools/serial_forwarder.py --stdin
+```
+
+Then check the latest reading:
+
+```powershell
+curl http://127.0.0.1:8000/readings/latest
+```
+
+The backend stores readings in PostgreSQL using the `DATABASE_URL` value from `.env.example`.
 
 Tempest combines embedded systems, backend development, databases, and basic electronics into one hands-on project.
