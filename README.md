@@ -105,4 +105,30 @@ curl http://127.0.0.1:8000/readings/latest
 
 The backend stores readings in PostgreSQL using the `DATABASE_URL` value from `.env.example`.
 
+## Web Dashboard
+
+The Next.js dashboard in `frontend/` displays the latest temperature, humidity, comfort state, recent readings, and a simple history chart.
+
+Install the frontend dependencies:
+
+```powershell
+cd frontend
+npm install
+```
+
+Start the dashboard:
+
+```powershell
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+The dashboard fetches through Next.js API routes, which proxy requests to the FastAPI backend at `TEMPEST_BACKEND_BASE_URL`. If the backend is unavailable or has no readings yet, the dashboard stays usable by showing clearly labeled placeholder readings.
+
 Tempest combines embedded systems, backend development, databases, and basic electronics into one hands-on project.
+
