@@ -163,22 +163,6 @@ When readings are forwarded successfully, the bridge prints output like:
 sent: temp_c=23.4,humidity=41.0,status=201
 ```
 
-## Demo Mode
-
-The dashboard can still run when the backend is unavailable or no readings have been stored yet. In that case, it shows clearly labeled placeholder readings instead of a broken screen. This makes the frontend useful during development and easier to demo while the hardware is disconnected.
-
-You can also test the bridge without the Arduino:
-
-```powershell
-'status=ok,temp_c=23.4,humidity=41.0' | python tools/serial_forwarder.py --stdin
-```
-
-Then check the latest reading:
-
-```powershell
-curl http://127.0.0.1:8000/readings/latest
-```
-
 ## Software and Skills
 
 - C++ for Arduino firmware
@@ -197,8 +181,4 @@ curl http://127.0.0.1:8000/readings/latest
 - LCD output for displaying live measurements
 - Serial output for sending hardware readings to software
 - Git and GitHub for version control and project organization
-
-## Interview Summary
-
-Tempest is an end-to-end telemetry project. The embedded layer collects real sensor data, the bridge translates USB Serial output into HTTP requests, the backend validates and persists readings, and the frontend visualizes the data. The design separates responsibilities clearly: hardware measures, the bridge transports, the backend owns data integrity, the database provides durability, and the dashboard presents the information to the user.
 
