@@ -1,4 +1,5 @@
 import argparse
+import io
 import json
 import sys
 import time
@@ -100,7 +101,8 @@ def open_serial_port(port: str, baud_rate: int, timeout_seconds: float) -> TextI
             "`python -m pip install -r tools/requirements.txt`."
         ) from error
 
-    return serial.Serial(port, baud_rate, timeout=timeout_seconds)
+    raw_serial = serial.Serial(port, baud_rate, timeout=timeout_seconds)
+    return io.TextIOWrapper(raw_serial, encoding="utf-8", errors="replace", newline="")
 
 
 def parse_args() -> argparse.Namespace:
@@ -146,3 +148,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
