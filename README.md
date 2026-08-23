@@ -4,17 +4,86 @@ Reliable Indoor Climate Telemetry.
 
 ![Tempest dashboard screenshot](docs/dashboard.png)
 
-Tempest is an indoor climate monitoring project that connects physical hardware to a backend system and a web dashboard. The project reads temperature and humidity from a sensor, sends that data into software, and organizes it so it can be stored, viewed, and used by other parts of the application.
+Tempest is a full-stack indoor climate monitoring project that connects a physical temperature/humidity sensor to a backend API, PostgreSQL database, and web dashboard. The system reads live room conditions from a DHT11 sensor, moves those readings through a small software pipeline, stores them, and displays them in a browser.
 
-The hardware side uses an Arduino Uno R3 connected to a DHT11 temperature and humidity sensor and a 16x2 LCD display. The Arduino reads the sensor data, shows the current room conditions on the LCD, and prints the readings over USB Serial.
+## Project Goal
 
-The backend side is the main software focus of the project. It is where the sensor readings can be received, validated, stored, and served through an API. Through Tempest, I am learning how backend systems work with real-world data instead of only static examples.
+The goal of Tempest is to demonstrate how real-world sensor data moves through a complete application stack:
 
-The frontend side uses Next.js to display the climate data in a web dashboard. This gives the project a simple full-stack structure: hardware collects the data, the backend processes it, and the frontend shows it to the user.
+```text
+DHT11 sensor
+-> Arduino Uno R3
+-> USB Serial
+-> Python serial forwarder
+-> FastAPI backend
+-> PostgreSQL database
+-> Next.js dashboard
+```
 
-## Current Goal
+This project is designed to be both practical and explainable. It combines embedded systems, backend API design, database persistence, and frontend visualization in one end-to-end workflow.
 
-The goal of Tempest is to build a full-stack indoor climate telemetry system. The Arduino reads live temperature and humidity from the DHT11 sensor, the computer forwards those readings into a backend API, the backend validates and stores the data, and the dashboard displays current and historical room conditions.
+## Architecture
+
+Tempest is split into six main parts:
+
+| Layer | Technology | Responsibility |
+| --- | --- | --- |
+| Sensor | DHT11 | Measures room temperature and humidity. |
+| Firmware | Arduino C++ | Reads the sensor, updates the LCD, and prints structured readings over USB Serial. |
+| Bridge | Python | Reads Serial output from the Arduino and forwards valid readings to the backend. |
+| Backend | FastAPI, Pydantic, SQLAlchemy | Validates readings, exposes API endpoints, and saves data. |
+| Storage | PostgreSQL | Stores climate readings so they survive backend restarts. |
+| Frontend | Next.js, React, TypeScript | Displays current conditions, recent readings, and a history chart. |
+
+The Arduino does not call the web API directly. Instead, it sends simple text over USB Serial because an Arduino Uno R3 does not have built-in Wi-Fi or Ethernet. A Python bridge runs on the computer connected to the Arduino, parses those Serial lines, and sends HTTP requests to the FastAPI backend.
+
+The backend is the boundary between raw device data and the rest of the application. It validates incoming readings, stores them in PostgreSQL, and serves them through API endpoints that the dashboard can read.
+
+The dashboard talks to local Next.js API routes, and those routes proxy requests to FastAPI. This keeps the browser-facing frontend simple and avoids browser CORS issues during local development.
+
+## Data Flow
+
+A successful reading moves through the system like this:
+
+1. The DHT11 measures temperature and humidity.
+2. The Arduino reads the sensor every 2 seconds.
+3. The Arduino prints a structured Serial line:
+
+```text
+status=ok,temp_c=23.4,humidity=41.0
+```
+
+4. The Python forwarder reads the Serial line and parses it into numbers.
+5. The forwarder sends the reading to the backend:
+
+```http
+POST /readings
+```
+
+6. FastAPI validates the request body with Pydantic.
+7. SQLAlchemy saves the reading into PostgreSQL.
+8. The Next.js dashboard fetches recent readings and updates the UI.
+
+If the sensor read fails, the Arduino prints an error line instead. The Python bridge ignores failed sensor lines so bad readings are not stored.
+
+## API Endpoints
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/health` | `GET` | Confirms the backend is running. |
+| `/readings` | `POST` | Stores a new temperature/humidity reading. |
+| `/readings` | `GET` | Returns recent readings. |
+| `/readings/latest` | `GET` | Returns the newest stored reading. |
+
+Example reading payload:
+
+```json
+{
+  "temp_c": 23.4,
+  "humidity": 41.0,
+  "source": "arduino-uno-dht11"
+}
+```
 
 ## Hardware
 
@@ -33,6 +102,82 @@ The goal of Tempest is to build a full-stack indoor climate telemetry system. Th
 - LCD D6 -> Arduino D5
 - LCD D7 -> Arduino D6
 - LCD RW -> GND
+
+## Run Locally
+
+Run these commands from the project folder:
+
+```powershell
+cd "C:\Users\smara\Documents\Projects\tempest"
+```
+
+Install backend dependencies:
+
+```powershell
+python -m pip install -r backend/requirements.txt
+```
+
+Start PostgreSQL:
+
+```powershell
+docker compose up -d postgres
+```
+
+Start the backend:
+
+```powershell
+python -m uvicorn backend.app.main:app --reload
+```
+
+In a second terminal, install frontend dependencies and start the dashboard:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open the dashboard:
+
+```text
+http://localhost:3000
+```
+
+## Arduino Live Mode
+
+Upload the firmware in `firmware/tempest_sensor_node/tempest_sensor_node.ino` to the Arduino. Then install the serial bridge dependency:
+
+```powershell
+python -m pip install -r tools/requirements.txt
+```
+
+Run the bridge, replacing `COM3` with the Arduino port shown by the Arduino IDE:
+
+```powershell
+python tools/serial_forwarder.py --port COM3
+```
+
+When readings are forwarded successfully, the bridge prints output like:
+
+```text
+sent: temp_c=23.4,humidity=41.0,status=201
+```
+
+## Demo Mode
+
+The dashboard can still run when the backend is unavailable or no readings have been stored yet. In that case, it shows clearly labeled placeholder readings instead of a broken screen. This makes the frontend useful during development and easier to demo while the hardware is disconnected.
+
+You can also test the bridge without the Arduino:
+
+```powershell
+'status=ok,temp_c=23.4,humidity=41.0' | python tools/serial_forwarder.py --stdin
+```
+
+Then check the latest reading:
+
+```powershell
+curl http://127.0.0.1:8000/readings/latest
+```
 
 ## Software and Skills
 
@@ -53,84 +198,7 @@ The goal of Tempest is to build a full-stack indoor climate telemetry system. Th
 - Serial output for sending hardware readings to software
 - Git and GitHub for version control and project organization
 
-## Serial to Backend Bridge
+## Interview Summary
 
-The Arduino firmware prints machine-readable sensor lines over USB Serial:
-
-```text
-status=ok,temp_c=23.4,humidity=41.0
-```
-
-The Python bridge in `tools/serial_forwarder.py` reads those lines and forwards successful readings to the backend API.
-
-Install the backend dependencies:
-
-```powershell
-python -m pip install -r backend/requirements.txt
-```
-
-Start PostgreSQL:
-
-```powershell
-docker compose up -d postgres
-```
-
-Start the local backend:
-
-```powershell
-python -m uvicorn backend.app.main:app --reload
-```
-
-Install the serial bridge dependency:
-
-```powershell
-python -m pip install -r tools/requirements.txt
-```
-
-Run the bridge, replacing `COM3` with the Arduino port shown by the Arduino IDE:
-
-```powershell
-python tools/serial_forwarder.py --port COM3
-```
-
-For a quick test without the Arduino connected, run:
-
-```powershell
-'status=ok,temp_c=23.4,humidity=41.0' | python tools/serial_forwarder.py --stdin
-```
-
-Then check the latest reading:
-
-```powershell
-curl http://127.0.0.1:8000/readings/latest
-```
-
-The backend stores readings in PostgreSQL using the `DATABASE_URL` value from `.env.example`.
-
-## Web Dashboard
-
-The Next.js dashboard in `frontend/` displays the latest temperature, humidity, comfort state, recent readings, and a simple history chart.
-
-Install the frontend dependencies:
-
-```powershell
-cd frontend
-npm install
-```
-
-Start the dashboard:
-
-```powershell
-npm run dev
-```
-
-Then open:
-
-```text
-http://localhost:3000
-```
-
-The dashboard fetches through Next.js API routes, which proxy requests to the FastAPI backend at `TEMPEST_BACKEND_BASE_URL`. If the backend is unavailable or has no readings yet, the dashboard stays usable by showing clearly labeled placeholder readings.
-
-Tempest combines embedded systems, backend development, databases, and basic electronics into one hands-on project.
+Tempest is an end-to-end telemetry project. The embedded layer collects real sensor data, the bridge translates USB Serial output into HTTP requests, the backend validates and persists readings, and the frontend visualizes the data. The design separates responsibilities clearly: hardware measures, the bridge transports, the backend owns data integrity, the database provides durability, and the dashboard presents the information to the user.
 
