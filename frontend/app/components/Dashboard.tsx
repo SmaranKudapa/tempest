@@ -9,10 +9,14 @@ import {
   placeholderReadings,
 } from "../lib/readings";
 
+type DashboardMode = "loading" | "live" | "placeholder";
+type TemperatureUnit = "C" | "F";
+
 type DashboardState = {
   readings: DashboardReading[];
-  mode: "loading" | "live" | "placeholder";
+  mode: DashboardMode;
   message: string;
+  lastCheckedAt: Date | null;
 };
 
 const refreshMs = 5000;
@@ -35,13 +39,16 @@ function useDashboardReadings(): DashboardState {
   const [state, setState] = useState<DashboardState>({
     readings: placeholderReadings,
     mode: "loading",
-    message: "Waiting for backend readings...",
+    message: "Checking the Tempest backend...",
+    lastCheckedAt: null,
   });
 
   useEffect(() => {
     let active = true;
 
     async function loadReadings() {
+      const checkedAt = new Date();
+
       try {
         const readings = await fetchJson<Reading[]>("/api/readings");
 
@@ -53,7 +60,8 @@ function useDashboardReadings(): DashboardState {
           setState({
             readings: placeholderReadings,
             mode: "placeholder",
-            message: "No stored readings yet. Showing placeholder data.",
+            message: "Backend connected. Waiting for the first stored reading.",
+            lastCheckedAt: checkedAt,
           });
           return;
         }
@@ -61,7 +69,8 @@ function useDashboardReadings(): DashboardState {
         setState({
           readings: normalizeReadings(readings),
           mode: "live",
-          message: "Live data from Tempest backend.",
+          message: "Live readings are being served from PostgreSQL.",
+          lastCheckedAt: checkedAt,
         });
       } catch {
         if (!active) {
@@ -71,7 +80,8 @@ function useDashboardReadings(): DashboardState {
         setState({
           readings: placeholderReadings,
           mode: "placeholder",
-          message: "Backend unavailable. Showing placeholder data.",
+          message: "Backend unavailable. Showing placeholder readings.",
+          lastCheckedAt: checkedAt,
         });
       }
     }
@@ -86,6 +96,14 @@ function useDashboardReadings(): DashboardState {
   }, []);
 
   return state;
+}
+
+function convertTemperature(tempC: number, unit: TemperatureUnit): number {
+  return unit === "C" ? tempC : (tempC * 9) / 5 + 32;
+}
+
+function formatTemperature(tempC: number, unit: TemperatureUnit): string {
+  return `${convertTemperature(tempC, unit).toFixed(1)} ${unit}`;
 }
 
 function getComfortLabel(tempC: number, humidity: number): string {
@@ -120,9 +138,15 @@ function getTrend(readings: DashboardReading[], field: "temp_c" | "humidity"): s
   return delta > 0 ? "Rising" : "Falling";
 }
 
-function HistoryChart({ readings }: { readings: DashboardReading[] }) {
+function HistoryChart({
+  readings,
+  unit,
+}: {
+  readings: DashboardReading[];
+  unit: TemperatureUnit;
+}) {
   const points = useMemo(() => [...readings].reverse().slice(-12), [readings]);
-  const temperatures = points.map((reading) => reading.temp_c);
+  const temperatures = points.map((reading) => convertTemperature(reading.temp_c, unit));
   const humidities = points.map((reading) => reading.humidity);
   const minTemp = Math.min(...temperatures) - 1;
   const maxTemp = Math.max(...temperatures) + 1;
@@ -151,7 +175,7 @@ function HistoryChart({ readings }: { readings: DashboardReading[] }) {
           <h2>Recent climate movement</h2>
         </div>
         <div className="legend" aria-label="Chart legend">
-          <span><i className="temp-key" />Temperature</span>
+          <span><i className="temp-key" />Temperature ({unit})</span>
           <span><i className="humidity-key" />Humidity</span>
         </div>
       </div>
@@ -167,10 +191,12 @@ function HistoryChart({ readings }: { readings: DashboardReading[] }) {
 }
 
 export default function Dashboard() {
-  const { readings, mode, message } = useDashboardReadings();
+  const { readings, mode, message, lastCheckedAt } = useDashboardReadings();
+  const [unit, setUnit] = useState<TemperatureUnit>("C");
   const latest = readings[0];
   const isPlaceholder = mode !== "live";
   const comfort = getComfortLabel(latest.temp_c, latest.humidity);
+  const statusLabel = mode === "live" ? "Live backend" : mode === "loading" ? "Checking backend" : "Placeholder data";
 
   return (
     <main className="dashboard-shell">
@@ -179,16 +205,34 @@ export default function Dashboard() {
           <p className="eyebrow">Tempest</p>
           <h1>Indoor climate dashboard</h1>
         </div>
-        <div className={`status-pill ${isPlaceholder ? "placeholder" : "live"}`}>
-          <span />
-          {isPlaceholder ? "Placeholder data" : "Live backend"}
+        <div className="toolbar" aria-label="Dashboard controls">
+          <div className="unit-toggle" aria-label="Temperature unit">
+            <button
+              className={unit === "C" ? "active" : ""}
+              type="button"
+              onClick={() => setUnit("C")}
+            >
+              C
+            </button>
+            <button
+              className={unit === "F" ? "active" : ""}
+              type="button"
+              onClick={() => setUnit("F")}
+            >
+              F
+            </button>
+          </div>
+          <div className={`status-pill ${isPlaceholder ? "placeholder" : "live"}`}>
+            <span />
+            {statusLabel}
+          </div>
         </div>
       </header>
 
       <section className="summary-band" aria-label="Current conditions">
         <div className="metric-card primary">
           <p>Temperature</p>
-          <strong>{latest.temp_c.toFixed(1)} C</strong>
+          <strong>{formatTemperature(latest.temp_c, unit)}</strong>
           <span>{getTrend(readings, "temp_c")}</span>
         </div>
         <div className="metric-card">
@@ -203,12 +247,13 @@ export default function Dashboard() {
         </div>
       </section>
 
-      <div className="notice" role="status">
-        {message}
+      <div className={`notice ${isPlaceholder ? "placeholder" : "live"}`} role="status">
+        <span>{message}</span>
+        <strong>{lastCheckedAt ? `Checked ${formatReadingTime(lastCheckedAt.toISOString())}` : "Checking now"}</strong>
       </div>
 
       <div className="content-grid">
-        <HistoryChart readings={readings} />
+        <HistoryChart readings={readings} unit={unit} />
 
         <section className="panel readings-panel" aria-label="Recent readings">
           <div className="panel-header compact">
@@ -224,7 +269,7 @@ export default function Dashboard() {
                   <strong>{formatReadingTime(reading.recorded_at)}</strong>
                   <span>{reading.source}</span>
                 </div>
-                <p>{reading.temp_c.toFixed(1)} C</p>
+                <p>{formatTemperature(reading.temp_c, unit)}</p>
                 <p>{reading.humidity.toFixed(1)}%</p>
               </div>
             ))}

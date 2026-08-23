@@ -137,11 +137,21 @@ npm install
 npm run dev
 ```
 
+The dashboard uses `frontend/.env.example` as the example frontend config. Copy it to `frontend/.env.local` if you need to point the dashboard at a different backend URL.
+
 Open the dashboard:
 
 ```text
 http://localhost:3000
 ```
+
+After dependencies are installed, you can start PostgreSQL, FastAPI, and the dashboard with one command:
+
+```powershell
+.\scripts\start-local.ps1
+```
+
+The script opens the backend and frontend servers in their own PowerShell windows. Keep those windows open while using the dashboard.
 
 ## Arduino Live Mode
 
